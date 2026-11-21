@@ -779,7 +779,7 @@
         lines.push('', 'Work:');
         if (t.tasks.length) t.tasks.forEach(task => lines.push(task.text));
         lines.push('', punchOutStr ? `Office Punch out: ${punchOutStr}` : 'Office Punch out:');
-        return lines.join('\\n');        return lines.join('\n');
+        return lines.join('\n');
       }
 
       // ---- Toast ----
