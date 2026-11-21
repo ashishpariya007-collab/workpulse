@@ -1371,8 +1371,9 @@
         state.today.timeline.sort((a,b) => new Date(b.time) - new Date(a.time));
         state.today.lastStage = state.today.punchOut ? 'punch_out' : (state.today.breaks.some(br => br.start && !br.end) ? 'break_in' : (state.today.breaks.length ? 'break_out' : (state.today.punchIn ? 'punch_in' : 'punch_in')));
         saveState();
+        renderSmartHero();
         renderLiveTick();
-        renderDashboard();
+        renderTimeline();
       }
 
       function restoreFromReportText(rawText) {
