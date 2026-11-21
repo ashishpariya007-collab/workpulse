@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>WorkPulse — Office Attendance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --ios-bg: #F2F2F7;
+      --ios-card: #FFFFFF;
+      --ios-sep: rgba(60, 60, 67, 0.12);
+      --ios-blue: #007AFF;
+      --ios-green: #34C759;
+      --ios-orange: #FF9500;
+      --ios-red: #FF3B30;
+      --ios-indigo: #5856D6;
+    }
+    * { -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+      background-color: #E8E8ED;
+      color: #1C1C1E;
+      letter-spacing: -0.01em;
+    }
+    .ios-shell {
+      background-color: var(--ios-bg);
+    }
+    .ios-card {
+      background-color: var(--ios-card);
+      border-radius: 22px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.03);
+    }
+    .ios-glass-top {
+      background: rgba(242, 242, 247, 0.82);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 0.5px solid var(--ios-sep);
+    }
+    .ios-glass-bottom {
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-top: 0.5px solid var(--ios-sep);
+    }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .ios-spring {
+      transition: transform 0.18s cubic-bezier(0.25, 0.8, 0.25, 1), background-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    }
+    .ios-spring:active { transform: scale(0.97); }
+    .ring-progress {
+      transition: stroke-dashoffset 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), stroke 0.3s ease;
+    }
+    @keyframes pulse-soft {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+    .live-dot { animation: pulse-soft 1.6s ease-in-out infinite; }
+    .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(60, 60, 67, 0.2); border-radius: 999px; }
+  </style>
+</head>
+<body class="min-h-screen flex justify-center sm:py-6 sm:px-4 antialiased selection:bg-blue-100 selection:text-blue-900">
+
+  <!-- iOS App Container -->
+  <div class="ios-shell w-full max-w-[440px] min-h-screen sm:min-h-[820px] sm:rounded-[38px] sm:shadow-[0_24px_70px_rgba(0,0,0,0.14)] sm:border sm:border-black/5 flex flex-col relative overflow-hidden">
+
+    <!-- Frosted Top Navigation Bar -->
+    <header class="ios-glass-top sticky top-0 z-30 px-5 pt-4 pb-3 flex items-center justify-between">
+      <div>
+        <div id="live-date" class="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">Loading...</div>
+        <h1 id="header-title" class="text-[22px] font-bold tracking-tight text-[#1C1C1E] leading-tight">Today</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <div id="live-clock" class="px-2.5 py-1 rounded-full bg-black/[0.05] text-[12px] font-semibold text-[#1C1C1E] tabular-nums">--:--:--</div>
+        <button id="btn-open-settings" type="button" class="ios-spring w-9 h-9 rounded-full bg-white shadow-xs border border-black/5 flex items-center justify-center text-[#1C1C1E]" title="Profile & Settings" aria-label="Profile and Settings">
+          <i data-lucide="user" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Scrollable App Body -->
+    <main class="flex-1 overflow-y-auto custom-scroll px-4 pt-4 pb-28 space-y-4">
+
+      <!-- ==================== TAB 1: TODAY (LIVE) ==================== -->
+      <section id="view-dashboard" class="space-y-4">
+
+        <!-- Hero Live Card + Single Smart Button -->
+        <div class="ios-card p-5 text-center space-y-5">
+          <!-- Status Pill + Top Utility Actions -->
+          <div class="flex items-center justify-between">
+            <span id="status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold bg-[#F2F2F7] text-[#636366]">
+              <span id="status-dot" class="w-2 h-2 rounded-full bg-[#8E8E93]"></span>
+              <span id="status-text">Not Punched In</span>
+            </span>
+            <div class="flex items-center gap-1.5">
+              <button id="btn-open-resume" type="button" class="ios-spring px-2.5 py-1 rounded-full bg-[#007AFF]/10 text-[#007AFF] text-[11px] font-semibold hover:bg-[#007AFF]/15" title="Resume shift from pasted report">
+                Resume
+              </button>
+              <button id="btn-manual-times" type="button" class="ios-spring p-1.5 rounded-full text-[#8E8E93] hover:text-[#1C1C1E] hover:bg-black/5" title="Adjust punch times" aria-label="Adjust punch times">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+              </button>
+              <button id="btn-reset-day" type="button" class="ios-spring p-1.5 rounded-full text-[#8E8E93] hover:text-[#FF3B30] hover:bg-red-50" title="Reset today" aria-label="Reset today">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Apple-Style Circular Progress Ring + Live Timer -->
+          <div class="relative w-44 h-44 mx-auto flex items-center justify-center">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 180 180" aria-hidden="true">
+              <circle cx="90" cy="90" r="78" fill="none" stroke="#F2F2F7" stroke-width="11"></circle>
+              <circle id="work-ring-circle" class="ring-progress" cx="90" cy="90" r="78" fill="none" stroke="#34C759" stroke-width="11" stroke-linecap="round" stroke-dasharray="490.09" stroke-dashoffset="490.09"></circle>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span id="ring-caption" class="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">Working Hrs</span>
+              <div id="metric-net-work" class="text-[30px] font-bold tracking-tight text-[#1C1C1E] tabular-nums leading-none mt-1">00:00:00</div>
+              <span id="ring-subcaption" class="text-[12px] font-medium text-[#8E8E93] mt-1.5 tabular-nums">Target 8h 00m</span>
+            </div>
+          </div>
+
+          <!-- 4-Step Auto Flow Stepper -->
+          <div class="grid grid-cols-4 gap-1 pt-1">
+            <div class="flex flex-col items-center">
+              <div id="step-dot-1" class="w-6 h-6 rounded-full bg-[#F2F2F7] text-[#8E8E93] flex items-center justify-center text-[11px] font-bold transition-colors">1</div>
+              <span class="text-[10px] font-semibold text-[#636366] mt-1">Punch In</span>
+              <span id="step-time-1" class="text-[10px] text-[#8E8E93] tabular-nums">--</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <div id="step-dot-2" class="w-6 h-6 rounded-full bg-[#F2F2F7] text-[#8E8E93] flex items-center justify-center text-[11px] font-bold transition-colors">2</div>
+              <span class="text-[10px] font-semibold text-[#636366] mt-1">Break In</span>
+              <span id="step-time-2" class="text-[10px] text-[#8E8E93] tabular-nums">--</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <div id="step-dot-3" class="w-6 h-6 rounded-full bg-[#F2F2F7] text-[#8E8E93] flex items-center justify-center text-[11px] font-bold transition-colors">3</div>
+              <span class="text-[10px] font-semibold text-[#636366] mt-1">Break Out</span>
+              <span id="step-time-3" class="text-[10px] text-[#8E8E93] tabular-nums">--</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <div id="step-dot-4" class="w-6 h-6 rounded-full bg-[#F2F2F7] text-[#8E8E93] flex items-center justify-center text-[11px] font-bold transition-colors">4</div>
+              <span class="text-[10px] font-semibold text-[#636366] mt-1">Punch Out</span>
+              <span id="step-time-4" class="text-[10px] text-[#8E8E93] tabular-nums">--</span>
+            </div>
+          </div>
+
+          <!-- SINGLE SMART AUTO-ADVANCING BUTTON -->
+          <div class="space-y-2 pt-1">
+            <button id="btn-smart-action" type="button" class="ios-spring w-full h-14 rounded-2xl bg-[#34C759] hover:brightness-95 text-white font-semibold text-[16px] shadow-md flex items-center justify-center gap-2.5">
+              <span id="smart-btn-icon-wrap" class="inline-flex items-center justify-center"><i data-lucide="log-in" class="w-5 h-5"></i></span>
+              <span id="smart-btn-label">Office Punch In</span>
+              <span id="smart-btn-badge" class="hidden px-2 py-0.5 rounded-full bg-white/25 text-[12px] font-bold tabular-nums">00:00</span>
+            </button>
+
+            <!-- Subtle Contextual Secondary Action (e.g., Skip Break / Take Another Break / New Day) -->
+            <div id="secondary-action-wrap" class="min-h-[20px] flex items-center justify-center">
+              <button id="btn-secondary-action" type="button" class="hidden text-[12px] font-semibold text-[#007AFF] hover:underline"></button>
+            </div>
+          </div>
+
+          <!-- Compact iOS Inset Stats Row -->
+          <div class="grid grid-cols-3 divide-x divide-black/[0.07] pt-3 border-t border-black/[0.06]">
+            <div>
+              <div class="text-[10px] font-semibold uppercase tracking-wide text-[#8E8E93]">Break</div>
+              <div id="metric-break-time" class="text-[14px] font-bold text-[#1C1C1E] tabular-nums mt-0.5">00:00</div>
+            </div>
+            <div>
+              <div class="text-[10px] font-semibold uppercase tracking-wide text-[#8E8E93]">Gross</div>
+              <div id="metric-gross-time" class="text-[14px] font-bold text-[#1C1C1E] tabular-nums mt-0.5">00:00</div>
+            </div>
+            <div>
+              <div class="text-[10px] font-semibold uppercase tracking-wide text-[#8E8E93]">Tasks</div>
+              <div id="metric-tasks-done" class="text-[14px] font-bold text-[#1C1C1E] tabular-nums mt-0.5">0 / 0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Direct Group Send Card (Clean, One-Tap) -->
+        <div class="ios-card p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-[#34C759]/15 text-[#248A3D] flex items-center justify-center shrink-0">
+                <i data-lucide="send" class="w-4 h-4"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[14px] font-bold text-[#1C1C1E] leading-tight">Send to Group</div>
+                <div id="report-stage-subtitle" class="text-[11px] font-medium text-[#8E8E93] truncate">Ready: Office Punch In</div>
+              </div>
+            </div>
+            <button id="btn-toggle-preview" type="button" class="ios-spring px-2.5 py-1 rounded-full bg-[#F2F2F7] text-[11px] font-semibold text-[#007AFF]">
+              Preview
+            </button>
+          </div>
+
+          <!-- Group Picker Pill -->
+          <div class="flex items-center gap-2">
+            <select id="target-group-select" aria-label="Target reporting group" class="flex-1 px-3 py-2.5 rounded-xl bg-[#F2F2F7] text-[13px] font-semibold text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30">
+              <!-- Populated dynamically -->
+            </select>
+            <button id="btn-copy-report" type="button" class="ios-spring px-3 py-2.5 rounded-xl bg-[#F2F2F7] hover:bg-[#E5E5EA] text-[#1C1C1E] text-[12px] font-semibold flex items-center gap-1 shrink-0" title="Copy message">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              Copy
+            </button>
+          </div>
+
+          <!-- Collapsible Live Preview & Stage Switcher -->
+          <div id="preview-drawer" class="hidden space-y-2.5 pt-1">
+            <div id="report-type-pills" class="flex flex-wrap gap-1.5">
+              <button type="button" data-report-type="auto" class="report-type-btn px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#007AFF] text-white">Auto</button>
+              <button type="button" data-report-type="punch_in" class="report-type-btn px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F2F2F7] text-[#3C3C43]">Punch In</button>
+              <button type="button" data-report-type="tasks" class="report-type-btn px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F2F2F7] text-[#3C3C43]">Tasks</button>
+              <button type="button" data-report-type="break_in" class="report-type-btn px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F2F2F7] text-[#3C3C43]">Break In</button>
+              <button type="button" data-report-type="break_out" class="report-type-btn px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F2F2F7] text-[#3C3C43]">Break Out</button>
+              <button type="button" data-report-type="punch_out" class="report-type-btn px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F2F2F7] text-[#3C3C43]">Punch Out</button>
+            </div>
+            <textarea id="report-preview" rows="7" class="w-full p-3 rounded-xl bg-[#F2F2F7] font-mono text-[11.5px] leading-relaxed text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30 resize-y"></textarea>
+            <div class="flex items-center justify-between">
+              <button id="btn-reset-preview" type="button" class="hidden text-[11px] font-semibold text-[#007AFF]">Restore Auto Message</button>
+              <div class="flex items-center gap-1.5 ml-auto">
+                <button id="btn-send-whatsapp" type="button" class="ios-spring px-2.5 py-1 rounded-lg bg-[#34C759]/15 text-[#248A3D] text-[11px] font-semibold">WhatsApp</button>
+                <button id="btn-send-telegram" type="button" class="ios-spring px-2.5 py-1 rounded-lg bg-[#007AFF]/15 text-[#007AFF] text-[11px] font-semibold">Telegram</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Primary Direct Send Button -->
+          <button id="btn-send-primary" type="button" class="ios-spring w-full py-3 rounded-xl bg-[#1C1C1E] hover:bg-black text-white text-[14px] font-semibold flex items-center justify-center gap-2 shadow-xs">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span id="btn-send-primary-label">Send to Office Attendance Group</span>
+          </button>
+        </div>
+
+        <!-- iOS Reminders-Style Tasks for the Day -->
+        <div class="ios-card p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-[15px] font-bold text-[#1C1C1E]">Tasks for the Day</h2>
+              <p class="text-[11px] text-[#8E8E93]">Included automatically in your reports</p>
+            </div>
+            <button id="btn-send-tasks-now" type="button" class="ios-spring inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#007AFF]/10 text-[#007AFF] text-[11px] font-semibold">
+              <i data-lucide="send" class="w-3 h-3"></i>
+              Send Tasks
+            </button>
+          </div>
+
+          <form id="task-form" class="flex items-center gap-2">
+            <input id="task-input" type="text" placeholder="Add a task for today..." class="flex-1 px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] text-[#1C1C1E] placeholder-[#8E8E93] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
+            <button type="submit" class="ios-spring w-10 h-10 rounded-xl bg-[#007AFF] text-white flex items-center justify-center shrink-0 shadow-xs" aria-label="Add task">
+              <i data-lucide="plus" class="w-5 h-5"></i>
+            </button>
+          </form>
+
+          <div id="task-list" class="divide-y divide-black/[0.06]">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Today's Compact Timeline -->
+        <div id="timeline-card" class="ios-card p-4 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-[14px] font-bold text-[#1C1C1E]">Today's Log</h2>
+            <span id="timeline-count" class="text-[11px] font-semibold text-[#8E8E93]">0 events</span>
+          </div>
+          <div id="timeline-list" class="space-y-2">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: GROUPS ==================== -->
+      <section id="view-groups" class="hidden space-y-4">
+        <div class="flex items-center justify-between px-1">
+          <p class="text-[12px] text-[#8E8E93]">Auto-route each punch stage to its respective group.</p>
+          <button id="btn-add-group-modal" type="button" class="ios-spring inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#007AFF] text-white text-[12px] font-semibold shadow-xs shrink-0">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            Add Group
+          </button>
+        </div>
+
+        <!-- Auto-Routing Grouped Card -->
+        <div class="ios-card p-4 space-y-3">
+          <h3 class="text-[12px] font-bold uppercase tracking-wider text-[#8E8E93]">Auto-Route by Stage</h3>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between gap-3">
+              <label for="route-punch_in" class="text-[13px] font-semibold text-[#1C1C1E]">Office Punch In</label>
+              <select id="route-punch_in" data-route-stage="punch_in" class="route-select w-48 px-2.5 py-1.5 rounded-lg bg-[#F2F2F7] text-[12px] font-semibold text-[#1C1C1E]"></select>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <label for="route-tasks" class="text-[13px] font-semibold text-[#1C1C1E]">Tasks for the Day</label>
+              <select id="route-tasks" data-route-stage="tasks" class="route-select w-48 px-2.5 py-1.5 rounded-lg bg-[#F2F2F7] text-[12px] font-semibold text-[#1C1C1E]"></select>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <label for="route-break" class="text-[13px] font-semibold text-[#1C1C1E]">Break In / Out</label>
+              <select id="route-break" data-route-stage="break" class="route-select w-48 px-2.5 py-1.5 rounded-lg bg-[#F2F2F7] text-[12px] font-semibold text-[#1C1C1E]"></select>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <label for="route-punch_out" class="text-[13px] font-semibold text-[#1C1C1E]">Office Punch Out</label>
+              <select id="route-punch_out" data-route-stage="punch_out" class="route-select w-48 px-2.5 py-1.5 rounded-lg bg-[#F2F2F7] text-[12px] font-semibold text-[#1C1C1E]"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Saved Groups List -->
+        <div id="groups-grid" class="space-y-3">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: HISTORY ==================== -->
+      <section id="view-history" class="hidden space-y-4">
+        <div class="flex items-center justify-between gap-2 px-1">
+          <button id="btn-save-today-history" type="button" class="ios-spring inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-black/5 text-[12px] font-semibold text-[#007AFF] shadow-xs">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i>
+            Save Today
+          </button>
+          <button id="btn-export-csv" type="button" class="ios-spring inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1C1C1E] text-white text-[12px] font-semibold shadow-xs">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            Export CSV
+          </button>
+        </div>
+
+        <div id="history-container" class="space-y-3">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Frosted iOS Bottom Tab Bar -->
+    <nav class="ios-glass-bottom absolute bottom-0 inset-x-0 z-30 px-6 pt-2 pb-4 flex items-center justify-around" aria-label="Bottom navigation">
+      <button id="nav-dashboard" type="button" class="nav-tab flex flex-col items-center gap-0.5 text-[#007AFF] transition-colors">
+        <i data-lucide="clock" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Today</span>
+      </button>
+      <button id="nav-groups" type="button" class="nav-tab flex flex-col items-center gap-0.5 text-[#8E8E93] transition-colors">
+        <i data-lucide="users" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Groups</span>
+      </button>
+      <button id="nav-history" type="button" class="nav-tab flex flex-col items-center gap-0.5 text-[#8E8E93] transition-colors">
+        <i data-lucide="calendar-days" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">History</span>
+      </button>
+    </nav>
+
+    <!-- Toast Pill (iOS Dynamic Island Style) -->
+    <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none w-full max-w-[380px] px-4"></div>
+  </div>
+
+  <!-- ==================== iOS SHEET MODALS ==================== -->
+
+  <!-- Settings Sheet -->
+  <div id="modal-settings" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-[420px] rounded-t-[28px] sm:rounded-[28px] p-5 pb-7 space-y-4 shadow-2xl">
+      <div class="w-10 h-1 rounded-full bg-black/15 mx-auto sm:hidden"></div>
+      <div class="flex items-center justify-between">
+        <h3 class="text-[17px] font-bold text-[#1C1C1E]">Profile &amp; Shift</h3>
+        <button type="button" data-close-modal="modal-settings" class="w-7 h-7 rounded-full bg-[#F2F2F7] text-[#636366] flex items-center justify-center">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="settings-form" class="space-y-3.5">
+        <div>
+          <label for="input-emp-name" class="block text-[12px] font-semibold text-[#636366] mb-1">Your Name</label>
+          <input id="input-emp-name" type="text" placeholder="e.g., Aarav Patel" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
+        </div>
+        <div>
+          <label for="input-emp-dept" class="block text-[12px] font-semibold text-[#636366] mb-1">Post</label>
+          <input id="input-emp-dept" type="text" placeholder="e.g., Social Media Manager" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
+        </div>
+        <div>
+          <label for="input-target-hours" class="block text-[12px] font-semibold text-[#636366] mb-1">Daily Target Hours</label>
+          <input id="input-target-hours" type="number" min="1" max="16" step="0.5" value="8" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
+        </div>
+        <button type="submit" class="ios-spring w-full py-3 rounded-xl bg-[#007AFF] text-white text-[15px] font-semibold mt-1">Save Changes</button>
+      </form>
+      <div class="pt-3 border-t border-black/[0.07] space-y-2">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-[#8E8E93]">Backup &amp; Restore Progress</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btn-export-backup" type="button" class="ios-spring py-2.5 px-3 rounded-xl bg-[#F2F2F7] hover:bg-[#E5E5EA] text-[12.5px] font-semibold text-[#1C1C1E] flex items-center justify-center gap-1.5">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            Save Backup
+          </button>
+          <button id="btn-import-backup" type="button" class="ios-spring py-2.5 px-3 rounded-xl bg-[#F2F2F7] hover:bg-[#E5E5EA] text-[12.5px] font-semibold text-[#007AFF] flex items-center justify-center gap-1.5">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+            Restore File
+          </button>
+          <input id="input-import-backup" type="file" accept=".json,application/json" class="hidden" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Group Sheet -->
+  <div id="modal-group" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-[420px] rounded-t-[28px] sm:rounded-[28px] p-5 pb-7 space-y-4 shadow-2xl">
+      <div class="w-10 h-1 rounded-full bg-black/15 mx-auto sm:hidden"></div>
+      <div class="flex items-center justify-between">
+        <h3 id="modal-group-title" class="text-[17px] font-bold text-[#1C1C1E]">Add Reporting Group</h3>
+        <button type="button" data-close-modal="modal-group" class="w-7 h-7 rounded-full bg-[#F2F2F7] text-[#636366] flex items-center justify-center">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="group-form" class="space-y-3.5">
+        <input id="input-group-id" type="hidden" />
+        <div>
+          <label for="input-group-name" class="block text-[12px] font-semibold text-[#636366] mb-1">Group Name</label>
+          <input id="input-group-name" type="text" required placeholder="e.g., Office Attendance Group" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
+        </div>
+        <div>
+          <label for="input-group-platform" class="block text-[12px] font-semibold text-[#636366] mb-1">Platform</label>
+          <select id="input-group-platform" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30">
+            <option value="whatsapp">WhatsApp</option>
+            <option value="telegram">Telegram</option>
+            <option value="teams">Teams / Slack (Copy &amp; Open)</option>
+            <option value="email">Email</option>
+          </select>
+        </div>
+        <div>
+          <label for="input-group-target" class="block text-[12px] font-semibold text-[#636366] mb-1">Group Invite Link / Phone / Email (Optional)</label>
+          <input id="input-group-target" type="text" placeholder="https://chat.whatsapp.com/... or leave blank" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
+        </div>
+        <button type="submit" class="ios-spring w-full py-3 rounded-xl bg-[#007AFF] text-white text-[15px] font-semibold mt-1">Save Group</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Adjust Times Sheet -->
+  <div id="modal-times" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-[420px] rounded-t-[28px] sm:rounded-[28px] p-5 pb-7 space-y-4 shadow-2xl">
+      <div class="w-10 h-1 rounded-full bg-black/15 mx-auto sm:hidden"></div>
+      <div class="flex items-center justify-between">
+        <h3 class="text-[17px] font-bold text-[#1C1C1E]">Adjust Today's Times</h3>
+        <button type="button" data-close-modal="modal-times" class="w-7 h-7 rounded-full bg-[#F2F2F7] text-[#636366] flex items-center justify-center">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="times-form" class="space-y-3.5">
+        <div>
+          <label for="input-edit-punch-in" class="block text-[12px] font-semibold text-[#636366] mb-1">Office Punch In</label>
+          <input id="input-edit-punch-in" type="time" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
+        </div>
+        <div>
+          <label for="input-edit-punch-out" class="block text-[12px] font-semibold text-[#636366] mb-1">Office Punch Out (optional)</label>
+          <input id="input-edit-punch-out" type="time" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
+        </div>
+        <button type="submit" class="ios-spring w-full py-3 rounded-xl bg-[#007AFF] text-white text-[15px] font-semibold mt-1">Apply Times</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reset Confirmation Alert Sheet -->
+  <div id="modal-reset" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-5">
+    <div class="bg-white/95 backdrop-blur-xl w-full max-w-[300px] rounded-[20px] overflow-hidden shadow-2xl text-center">
+      <div class="p-5 pb-4">
+        <h3 class="text-[16px] font-bold text-[#1C1C1E]">Reset Today's Shift?</h3>
+        <p class="text-[13px] text-[#636366] mt-1">Clears today's punches and breaks. Saved history and groups stay untouched.</p>
+      </div>
+      <div class="grid grid-cols-2 border-t border-black/10 divide-x divide-black/10">
+        <button type="button" data-close-modal="modal-reset" class="py-3 text-[15px] font-medium text-[#007AFF] active:bg-black/5">Cancel</button>
+        <button id="btn-confirm-reset" type="button" class="py-3 text-[15px] font-bold text-[#FF3B30] active:bg-black/5">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resume Shift from Report Sheet -->
+  <div id="modal-resume" class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-[420px] rounded-t-[28px] sm:rounded-[28px] p-5 pb-7 space-y-3.5 shadow-2xl">
+      <div class="w-10 h-1 rounded-full bg-black/15 mx-auto sm:hidden"></div>
+      <div class="flex items-center justify-between">
+        <h3 class="text-[17px] font-bold text-[#1C1C1E]">Resume Today's Shift</h3>
+        <button type="button" data-close-modal="modal-resume" class="w-7 h-7 rounded-full bg-[#F2F2F7] text-[#636366] flex items-center justify-center">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <p class="text-[12.5px] text-[#636366]">Paste your earlier WhatsApp report message below to instantly restore your punch times, breaks, and tasks.</p>
+      <form id="resume-form" class="space-y-3">
+        <textarea id="input-resume-text" rows="7" placeholder="Office Punch in: 10:40&#10;Break Punch in: 2:15&#10;&#10;Work:&#10;Coordination&#10;Content" class="w-full p-3 rounded-xl bg-[#F2F2F7] font-mono text-[12px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30 resize-y"></textarea>
+        <button type="submit" class="ios-spring w-full py-3 rounded-xl bg-[#007AFF] text-white text-[15px] font-semibold">Restore Live Shift</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const STORAGE_KEY = 'workpulse_attendance_v1';
+      const RING_CIRCUMFERENCE = 2 * Math.PI * 78; // 490.09
+
+      const DEFAULT_GROUPS = [
+        { id: 'grp_attendance', name: 'Office Attendance Group', platform: 'whatsapp', target: '' },
+        { id: 'grp_tasks', name: 'Daily Tasks & EOD Group', platform: 'whatsapp', target: '' },
+        { id: 'grp_team', name: 'Team Updates Channel', platform: 'telegram', target: '' }
+      ];
+
+      function getTodayKey() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      }
+
+      function createEmptyDay(dateKey) {
+        return {
+          dateKey: dateKey || getTodayKey(),
+          punchIn: null,
+          punchOut: null,
+          breaks: [],
+          tasks: [],
+          timeline: [],
+          lastStage: 'punch_in'
+        };
+      }
+
+      const defaultState = {
+        profile: { name: 'Ashish Pariya', department: 'Social Media Manager', targetHours: 8 },
+        groups: DEFAULT_GROUPS,
+        routes: {
+          punch_in: 'grp_attendance',
+          tasks: 'grp_tasks',
+          break: 'grp_attendance',
+          punch_out: 'grp_tasks'
+        },
+        today: createEmptyDay(getTodayKey()),
+        history: [],
+        ui: {
+          activeView: 'dashboard',
+          reportType: 'auto',
+          selectedGroupId: 'grp_attendance',
+          customPreviewEdited: false,
+          previewOpen: true
+        }
+      };
+
+      let state = loadState();
+      let clockInterval = null;
+
+      function cloneObj(o) { return JSON.parse(JSON.stringify(o)); }
+
+      function readPersistedRaw() {
+        try {
+          const ls = localStorage.getItem(STORAGE_KEY);
+          if (ls) return ls;
+        } catch (e) {}
+        try {
+          const ss = sessionStorage.getItem(STORAGE_KEY);
+          if (ss) return ss;
+        } catch (e) {}
+        try {
+          if (window.name && window.name.startsWith('WP_STATE:')) {
+            return window.name.slice(9);
+          }
+        } catch (e) {}
+        return null;
+      }
+
+      function writePersistedRaw(serialized) {
+        try { localStorage.setItem(STORAGE_KEY, serialized); } catch (e) {}
+        try { sessionStorage.setItem(STORAGE_KEY, serialized); } catch (e) {}
+        try { window.name = 'WP_STATE:' + serialized; } catch (e) {}
+      }
+
+      function loadState() {
+        try {
+          const raw = readPersistedRaw();
+          if (!raw) return cloneObj(defaultState);
+          const parsed = JSON.parse(raw);
+          const merged = {
+            profile: {
+              ...defaultState.profile,
+              ...(parsed.profile || {}),
+              name: (parsed.profile && parsed.profile.name) ? parsed.profile.name : defaultState.profile.name,
+              department: (parsed.profile && parsed.profile.department) ? parsed.profile.department : defaultState.profile.department
+            },
+            groups: Array.isArray(parsed.groups) && parsed.groups.length ? parsed.groups : cloneObj(DEFAULT_GROUPS),
+            routes: { ...defaultState.routes, ...(parsed.routes || {}) },
+            today: parsed.today && parsed.today.dateKey === getTodayKey()
+              ? { ...createEmptyDay(getTodayKey()), ...parsed.today }
+              : createEmptyDay(getTodayKey()),
+            history: Array.isArray(parsed.history) ? parsed.history : [],
+            ui: { ...defaultState.ui, ...(parsed.ui || {}), customPreviewEdited: false, previewOpen: true }
+          };
+          if (!merged.groups.some(g => g.id === merged.ui.selectedGroupId)) {
+            merged.ui.selectedGroupId = merged.groups[0].id;
+          }
+          return merged;
+        } catch (e) {
+          return cloneObj(defaultState);
+        }
+      }
+
+      function saveState() {
+        try {
+          const serialized = JSON.stringify({
+            profile: state.profile,
+            groups: state.groups,
+            routes: state.routes,
+            today: state.today,
+            history: state.history,
+            ui: {
+              activeView: state.ui.activeView,
+              reportType: state.ui.reportType,
+              selectedGroupId: state.ui.selectedGroupId
+            }
+          });
+          writePersistedRaw(serialized);
+        } catch (e) { /* memory fallback */ }
+      }
+
+      // ---- Formatting ----
+      function formatTime12(isoOrDate) {
+        if (!isoOrDate) return '--';
+        const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
+        if (isNaN(d.getTime())) return '--';
+        return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      }
+
+      function formatClockWithSec(date) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      }
+
+      function formatDateReadable(date) {
+        return date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+      }
+
+      function formatDateFull(date) {
+        return date.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+      }
+
+      function formatDateDDMMYYYY(date) {
+        const d = date || new Date();
+        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      }
+
+      function formatTimeShort(isoOrDate) {
+        if (!isoOrDate) return '';
+        const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
+        if (isNaN(d.getTime())) return '';
+        let h = d.getHours() % 12;
+        if (h === 0) h = 12;
+        const m = String(d.getMinutes()).padStart(2, '0');
+        return `${h}:${m}`;
+      }
+
+      function formatDurationHMS(ms) {
+        const sTotal = Math.floor(Math.max(0, ms || 0) / 1000);
+        const h = Math.floor(sTotal / 3600);
+        const m = Math.floor((sTotal % 3600) / 60);
+        const s = sTotal % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+
+      function formatDurationHM(ms) {
+        const mTotal = Math.floor(Math.max(0, ms || 0) / 60000);
+        const h = Math.floor(mTotal / 60);
+        const m = mTotal % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+
+      function formatDurationHuman(ms) {
+        const mTotal = Math.floor(Math.max(0, ms || 0) / 60000);
+        const h = Math.floor(mTotal / 60);
+        const m = mTotal % 60;
+        if (h === 0) return `${m}m`;
+        return `${h}h ${String(m).padStart(2, '0')}m`;
+      }
+
+      function toTimeInputValue(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      }
+
+      function applyTimeToToday(timeStr) {
+        if (!timeStr) return null;
+        const [hh, mm] = timeStr.split(':');
+        const d = new Date();
+        d.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
+        return d.toISOString();
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      // ---- Core Logic ----
+      function getActiveBreak() {
+        return state.today.breaks.find(b => b.start && !b.end) || null;
+      }
+
+      // Smart 1-Button State Machine:
+      // 1) idle -> Office Punch In
+      // 2) working (no breaks yet) -> Break Punch In (secondary: Skip break -> Punch Out)
+      // 3) on_break -> Break Punch Out
+      // 4) working (after >=1 break) -> Office Punch Out (secondary: + Take another break)
+      // 5) completed -> Send EOD Report to Group (secondary: Start New Day)
+      function getSmartStage() {
+        const t = state.today;
+        if (!t.punchIn) return 'need_punch_in';
+        if (t.punchOut) return 'completed';
+        if (getActiveBreak()) return 'need_break_out';
+        if (t.breaks.length === 0) return 'need_break_in';
+        return 'need_punch_out';
+      }
+
+      function computeMetrics(nowMs) {
+        const now = nowMs || Date.now();
+        const t = state.today;
+        let grossMs = 0;
+        if (t.punchIn) {
+          const startMs = new Date(t.punchIn).getTime();
+          const endMs = t.punchOut ? new Date(t.punchOut).getTime() : now;
+          grossMs = Math.max(0, endMs - startMs);
+        }
+
+        let totalBreakMs = 0;
+        let activeBreakMs = 0;
+        for (const b of t.breaks) {
+          const bs = new Date(b.start).getTime();
+          const be = b.end ? new Date(b.end).getTime() : (t.punchOut ? new Date(t.punchOut).getTime() : now);
+          const dur = Math.max(0, be - bs);
+          totalBreakMs += dur;
+          if (!b.end) activeBreakMs = dur;
+        }
+
+        const netWorkMs = Math.max(0, grossMs - totalBreakMs);
+        const targetMs = Math.max(1, Number(state.profile.targetHours) || 8) * 3600000;
+        const progressRatio = Math.min(1, netWorkMs / targetMs);
+        return { grossMs, totalBreakMs, activeBreakMs, netWorkMs, progressRatio };
+      }
+
+      function getEffectiveReportType() {
+        return state.ui.reportType !== 'auto' ? state.ui.reportType : (state.today.lastStage || 'punch_in');
+      }
+
+      function getRouteForReportType(type) {
+        if (type === 'punch_in') return state.routes.punch_in;
+        if (type === 'tasks') return state.routes.tasks;
+        if (type === 'break_in' || type === 'break_out') return state.routes.break;
+        if (type === 'punch_out') return state.routes.punch_out;
+        return state.groups[0]?.id;
+      }
+
+      function buildReportMessage(type) {
+        const t = state.today;
+        const name = (state.profile.name || 'Ashish Pariya').trim();
+        const post = (state.profile.department || 'Social Media Manager').trim();
+        const dateStr = formatDateDDMMYYYY(new Date());
+
+        const firstBreak = t.breaks[0] || null;
+        const lastBreak = t.breaks[t.breaks.length - 1] || null;
+
+        const punchInStr = t.punchIn ? formatTimeShort(t.punchIn) : '';
+        const breakInStr = firstBreak && firstBreak.start ? formatTimeShort(firstBreak.start) : '';
+        const breakOutStr = lastBreak && lastBreak.end ? formatTimeShort(lastBreak.end) : '';
+        const punchOutStr = t.punchOut ? formatTimeShort(t.punchOut) : '';
+
+        const lines = [
+          `Name: ${name}`,
+          `Post: ${post}`,
+          `Date: ${dateStr}`,
+          '',
+          punchInStr ? `Office Punch in: ${punchInStr}` : 'Office Punch in:',
+          breakInStr ? `Break Punch in: ${breakInStr}` : 'Break Punch in:',
+          '',
+          'Work:'
+        ];
+
+        if (t.tasks.length) {
+          t.tasks.forEach(task => lines.push(task.text));
+        }
+
+        lines.push(
+          '',
+          breakOutStr ? `Break Punch out: ${breakOutStr}` : 'Break Punch out:',
+          punchOutStr ? `Office Punch out: ${punchOutStr}` : 'Office Punch out:'
+        );
+
+        return lines.join('\n');
+      }
+
+      // ---- Toast ----
+      function showToast(msg) {
+        const container = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        el.className = 'pointer-events-auto px-4 py-2.5 rounded-full bg-[#1C1C1E]/95 text-white text-[12.5px] font-semibold shadow-xl backdrop-blur-md transition-all duration-300';
+        el.textContent = msg;
+        container.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(-6px)';
+          setTimeout(() => el.remove(), 260);
+        }, 2400);
+      }
+
+      // ---- Clipboard & Direct Group Send ----
+      function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+        }
+        return Promise.resolve(fallbackCopy(text));
+      }
+
+      function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+        document.body.removeChild(ta);
+      }
+
+      function openWhatsApp(text, target) {
+        const clean = (target || '').trim();
+        copyText(text);
+        if (clean && /^https?:\/\//i.test(clean)) {
+          window.open(clean, '_blank', 'noopener,noreferrer');
+          showToast('Copied! Paste & send in WhatsApp group');
+          return;
+        }
+        const digits = clean.replace(/[^\d]/g, '');
+        const encoded = encodeURIComponent(text);
+        const url = digits.length >= 8
+          ? `https://wa.me/${digits}?text=${encoded}`
+          : `https://api.whatsapp.com/send?text=${encoded}`;
+        window.open(url, '_blank', 'noopener,noreferrer');
+        showToast('Opened WhatsApp with report ready');
+      }
+
+      function openTelegram(text, target) {
+        const clean = (target || '').trim();
+        copyText(text);
+        if (clean && /^https?:\/\//i.test(clean)) {
+          window.open(clean, '_blank', 'noopener,noreferrer');
+          showToast('Copied! Paste & send in Telegram group');
+          return;
+        }
+        window.open(`https://t.me/share/url?url=&text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+        showToast('Opened Telegram share sheet');
+      }
+
+      function sendToSelectedGroup() {
+        const text = document.getElementById('report-preview').value.trim();
+        if (!text) return;
+        const group = state.groups.find(g => g.id === state.ui.selectedGroupId) || state.groups[0];
+        if (!group) {
+          copyText(text);
+          showToast('Copied to clipboard');
+          return;
+        }
+        if (group.platform === 'whatsapp') {
+          openWhatsApp(text, group.target);
+        } else if (group.platform === 'telegram') {
+          openTelegram(text, group.target);
+        } else if (group.platform === 'email') {
+          copyText(text);
+          const subj = encodeURIComponent(`Attendance Report — ${formatDateFull(new Date())}`);
+          window.open(`mailto:${(group.target || '').trim()}?subject=${subj}&body=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+          showToast(`Opened email for ${group.name}`);
+        } else {
+          copyText(text);
+          if (group.target && /^https?:\/\//i.test(group.target.trim())) {
+            window.open(group.target.trim(), '_blank', 'noopener,noreferrer');
+            showToast(`Copied & opened ${group.name}`);
+          } else {
+            showToast(`Copied! Paste into ${group.name}`);
+          }
+        }
+      }
+
+      // ---- Punch Mutations ----
+      function addEvent(type, label, iso) {
+        state.today.timeline.unshift({
+          id: 'ev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+          type,
+          label,
+          time: iso || new Date().toISOString()
+        });
+      }
+
+      function autoRoute(stage) {
+        const id = getRouteForReportType(stage);
+        if (id && state.groups.some(g => g.id === id)) {
+          state.ui.selectedGroupId = id;
+        }
+      }
+
+      function doPunchIn() {
+        const now = new Date().toISOString();
+        state.today.punchIn = now;
+        state.today.lastStage = 'punch_in';
+        state.ui.reportType = 'auto';
+        state.ui.customPreviewEdited = false;
+        addEvent('punch_in', 'Office Punch In', now);
+        autoRoute('punch_in');
+        saveState();
+        renderAll();
+        showToast(`Punched In at ${formatTime12(now)}`);
+      }
+
+      function doBreakIn() {
+        const now = new Date().toISOString();
+        const num = state.today.breaks.length + 1;
+        state.today.breaks.push({ id: 'brk_' + Date.now(), start: now, end: null });
+        state.today.lastStage = 'break_in';
+        state.ui.reportType = 'auto';
+        state.ui.customPreviewEdited = false;
+        addEvent('break_in', `Break #${num} Punch In`, now);
+        autoRoute('break_in');
+        saveState();
+        renderAll();
+        showToast(`Break #${num} started`);
+      }
+
+      function doBreakOut() {
+        const active = getActiveBreak();
+        if (!active) return;
+        const now = new Date().toISOString();
+        active.end = now;
+        const dur = formatDurationHuman(new Date(now).getTime() - new Date(active.start).getTime());
+        state.today.lastStage = 'break_out';
+        state.ui.reportType = 'auto';
+        state.ui.customPreviewEdited = false;
+        addEvent('break_out', `Break Punch Out (${dur})`, now);
+        autoRoute('break_out');
+        saveState();
+        renderAll();
+        showToast(`Back from break (${dur})`);
+      }
+
+      function doPunchOut() {
+        const now = new Date().toISOString();
+        const active = getActiveBreak();
+        if (active) active.end = now;
+        state.today.punchOut = now;
+        state.today.lastStage = 'punch_out';
+        state.ui.reportType = 'auto';
+        state.ui.customPreviewEdited = false;
+        addEvent('punch_out', 'Office Punch Out', now);
+        autoRoute('punch_out');
+        upsertTodayHistory();
+        saveState();
+        renderAll();
+        showToast(`Punched Out at ${formatTime12(now)}`);
+      }
+
+      function handleSmartButtonClick() {
+        const stage = getSmartStage();
+        if (stage === 'need_punch_in') doPunchIn();
+        else if (stage === 'need_break_in') doBreakIn();
+        else if (stage === 'need_break_out') doBreakOut();
+        else if (stage === 'need_punch_out') doPunchOut();
+        else if (stage === 'completed') sendToSelectedGroup();
+      }
+
+      function handleSecondaryButtonClick() {
+        const stage = getSmartStage();
+        if (stage === 'need_break_in') doPunchOut();
+        else if (stage === 'need_punch_out') doBreakIn();
+        else if (stage === 'completed') openModal('modal-reset');
+      }
+
+      function upsertTodayHistory() {
+        const t = state.today;
+        if (!t.punchIn) return;
+        const m = computeMetrics();
+        const done = t.tasks.filter(x => x.done).length;
+        const entry = {
+          dateKey: t.dateKey,
+          dateReadable: formatDateFull(new Date(t.punchIn)),
+          punchIn: t.punchIn,
+          punchOut: t.punchOut,
+          netWorkMs: m.netWorkMs,
+          totalBreakMs: m.totalBreakMs,
+          breakCount: t.breaks.length,
+          tasksDone: done,
+          tasksTotal: t.tasks.length
+        };
+        const idx = state.history.findIndex(h => h.dateKey === t.dateKey);
+        if (idx >= 0) state.history[idx] = entry;
+        else state.history.unshift(entry);
+      }
+
+      // ---- Rendering ----
+      function renderLiveTick() {
+        const now = new Date();
+        document.getElementById('live-clock').textContent = formatClockWithSec(now);
+        document.getElementById('live-date').textContent = formatDateReadable(now);
+
+        const m = computeMetrics(now.getTime());
+        const stage = getSmartStage();
+
+        document.getElementById('metric-net-work').textContent = stage === 'need_break_out'
+          ? formatDurationHMS(m.activeBreakMs)
+          : formatDurationHMS(m.netWorkMs);
+        document.getElementById('ring-caption').textContent = stage === 'need_break_out' ? 'Break Live' : 'Working Hrs';
+
+        const targetH = Number(state.profile.targetHours) || 8;
+        const wH = Math.floor(targetH);
+        const wM = Math.round((targetH - wH) * 60);
+        document.getElementById('ring-subcaption').textContent = stage === 'need_break_out'
+          ? `Work: ${formatDurationHM(m.netWorkMs)}`
+          : `Target ${wH}h ${String(wM).padStart(2, '0')}m`;
+
+        const ringEl = document.getElementById('work-ring-circle');
+        const offset = RING_CIRCUMFERENCE * (1 - m.progressRatio);
+        ringEl.style.strokeDashoffset = offset;
+        ringEl.style.stroke = stage === 'need_break_out' ? '#FF9500' : (stage === 'completed' ? '#5856D6' : '#34C759');
+
+        document.getElementById('metric-break-time').textContent = formatDurationHM(m.totalBreakMs);
+        document.getElementById('metric-gross-time').textContent = formatDurationHM(m.grossMs);
+        const done = state.today.tasks.filter(x => x.done).length;
+        document.getElementById('metric-tasks-done').textContent = `${done} / ${state.today.tasks.length}`;
+
+        const badge = document.getElementById('smart-btn-badge');
+        if (stage === 'need_break_out') {
+          badge.classList.remove('hidden');
+          badge.textContent = formatDurationHMS(m.activeBreakMs);
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+
+      function renderSmartHero() {
+        const stage = getSmartStage();
+        const t = state.today;
+        const firstBreak = t.breaks[0] || null;
+        const lastBreak = t.breaks[t.breaks.length - 1] || null;
+
+        // Status pill
+        const badgeEl = document.getElementById('status-badge');
+        const dotEl = document.getElementById('status-dot');
+        const textEl = document.getElementById('status-text');
+
+        const statusMap = {
+          need_punch_in: { bg: 'bg-[#F2F2F7] text-[#636366]', dot: 'bg-[#8E8E93]', live: false, text: 'Not Punched In' },
+          need_break_in: { bg: 'bg-[#34C759]/15 text-[#248A3D]', dot: 'bg-[#34C759]', live: true, text: 'Working Live' },
+          need_break_out: { bg: 'bg-[#FF9500]/15 text-[#C93400]', dot: 'bg-[#FF9500]', live: true, text: 'On Break' },
+          need_punch_out: { bg: 'bg-[#34C759]/15 text-[#248A3D]', dot: 'bg-[#34C759]', live: true, text: 'Working Live' },
+          completed: { bg: 'bg-[#5856D6]/15 text-[#5856D6]', dot: 'bg-[#5856D6]', live: false, text: 'Shift Completed' }
+        };
+        const st = statusMap[stage];
+        badgeEl.className = `inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold ${st.bg}`;
+        dotEl.className = `w-2 h-2 rounded-full ${st.dot} ${st.live ? 'live-dot' : ''}`;
+        textEl.textContent = st.text;
+
+        // 4-step stepper
+        const stepsDone = [
+          Boolean(t.punchIn),
+          Boolean(firstBreak && firstBreak.start),
+          Boolean(lastBreak && lastBreak.end),
+          Boolean(t.punchOut)
+        ];
+        const stepTimes = [
+          formatTime12(t.punchIn),
+          firstBreak ? formatTime12(firstBreak.start) : '--',
+          lastBreak && lastBreak.end ? formatTime12(lastBreak.end) : '--',
+          formatTime12(t.punchOut)
+        ];
+        const activeStepIdx = stage === 'need_punch_in' ? 0
+          : stage === 'need_break_in' ? 1
+          : stage === 'need_break_out' ? 2
+          : stage === 'need_punch_out' ? 3 : 4;
+
+        for (let i = 0; i < 4; i++) {
+          const dEl = document.getElementById(`step-dot-${i + 1}`);
+          const tEl = document.getElementById(`step-time-${i + 1}`);
+          tEl.textContent = stepTimes[i];
+          if (stepsDone[i]) {
+            dEl.className = 'w-6 h-6 rounded-full bg-[#34C759] text-white flex items-center justify-center text-[11px] font-bold transition-colors';
+            dEl.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
+          } else if (i === activeStepIdx) {
+            dEl.className = 'w-6 h-6 rounded-full bg-[#007AFF] text-white flex items-center justify-center text-[11px] font-bold ring-4 ring-[#007AFF]/15 transition-colors';
+            dEl.textContent = String(i + 1);
+          } else {
+            dEl.className = 'w-6 h-6 rounded-full bg-[#F2F2F7] text-[#8E8E93] flex items-center justify-center text-[11px] font-bold transition-colors';
+            dEl.textContent = String(i + 1);
+          }
+        }
+
+        // Single Smart Button appearance
+        const btn = document.getElementById('btn-smart-action');
+        const label = document.getElementById('smart-btn-label');
+        const iconWrap = document.getElementById('smart-btn-icon-wrap');
+        const secBtn = document.getElementById('btn-secondary-action');
+
+        const btnCfg = {
+          need_punch_in: {
+            bg: 'bg-[#34C759]',
+            icon: 'log-in',
+            label: 'Office Punch In',
+            sec: null
+          },
+          need_break_in: {
+            bg: 'bg-[#FF9500]',
+            icon: 'coffee',
+            label: 'Break Punch In',
+            sec: 'Skip break? Tap for Office Punch Out'
+          },
+          need_break_out: {
+            bg: 'bg-[#007AFF]',
+            icon: 'play',
+            label: 'Break Punch Out',
+            sec: null
+          },
+          need_punch_out: {
+            bg: 'bg-[#FF3B30]',
+            icon: 'log-out',
+            label: 'Office Punch Out',
+            sec: '+ Take another break'
+          },
+          completed: {
+            bg: 'bg-[#5856D6]',
+            icon: 'send',
+            label: 'Send EOD Report to Group',
+            sec: 'Start a new shift'
+          }
+        }[stage];
+
+        btn.className = `ios-spring w-full h-14 rounded-2xl ${btnCfg.bg} hover:brightness-95 text-white font-semibold text-[16px] shadow-md flex items-center justify-center gap-2.5`;
+        label.textContent = btnCfg.label;
+        iconWrap.innerHTML = `<i data-lucide="${btnCfg.icon}" class="w-5 h-5"></i>`;
+
+        if (btnCfg.sec) {
+          secBtn.classList.remove('hidden');
+          secBtn.textContent = btnCfg.sec;
+        } else {
+          secBtn.classList.add('hidden');
+        }
+      }
+
+      function renderTasks() {
+        const list = document.getElementById('task-list');
+        if (!state.today.tasks.length) {
+          list.innerHTML = `<p class="text-[12.5px] text-[#8E8E93] text-center py-3">No tasks added yet.</p>`;
+          return;
+        }
+        list.innerHTML = state.today.tasks.map(task => `
+          <div class="flex items-center gap-3 py-2.5">
+            <button type="button" data-toggle-task="${task.id}" class="ios-spring w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${task.done ? 'bg-[#34C759] border-[#34C759] text-white' : 'border-[#C7C7CC] bg-white'}" aria-label="Toggle task">
+              ${task.done ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}
+            </button>
+            <span class="flex-1 text-[14px] ${task.done ? 'line-through text-[#8E8E93]' : 'text-[#1C1C1E] font-medium'} break-words">${escapeHtml(task.text)}</span>
+            <button type="button" data-delete-task="${task.id}" class="p-1 text-[#C7C7CC] hover:text-[#FF3B30]" aria-label="Delete task">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `).join('');
+      }
+
+      function renderTimeline() {
+        const list = document.getElementById('timeline-list');
+        const items = state.today.timeline;
+        document.getElementById('timeline-count').textContent = `${items.length} event${items.length === 1 ? '' : 's'}`;
+        if (!items.length) {
+          list.innerHTML = `<p class="text-[12px] text-[#8E8E93] text-center py-2">Your live punches appear here.</p>`;
+          return;
+        }
+        const dotMap = {
+          punch_in: 'bg-[#34C759]',
+          break_in: 'bg-[#FF9500]',
+          break_out: 'bg-[#007AFF]',
+          punch_out: 'bg-[#FF3B30]'
+        };
+        list.innerHTML = items.map(ev => `
+          <div class="flex items-center justify-between text-[13px] py-1">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="w-2 h-2 rounded-full shrink-0 ${dotMap[ev.type] || 'bg-[#8E8E93]'}"></span>
+              <span class="font-medium text-[#1C1C1E] truncate">${escapeHtml(ev.label)}</span>
+            </div>
+            <span class="text-[12px] font-semibold text-[#8E8E93] tabular-nums shrink-0">${formatTime12(ev.time)}</span>
+          </div>
+        `).join('');
+      }
+
+      function renderGroupSelectors() {
+        const labels = { whatsapp: 'WhatsApp', telegram: 'Telegram', teams: 'Teams/Slack', email: 'Email' };
+        const sel = document.getElementById('target-group-select');
+        sel.innerHTML = state.groups.map(g => `
+          <option value="${g.id}" ${g.id === state.ui.selectedGroupId ? 'selected' : ''}>
+            ${escapeHtml(g.name)} (${labels[g.platform] || g.platform})
+          </option>
+        `).join('');
+
+        const active = state.groups.find(g => g.id === state.ui.selectedGroupId) || state.groups[0];
+        if (active) {
+          document.getElementById('btn-send-primary-label').textContent = `Send to ${active.name}`;
+        }
+
+        document.querySelectorAll('.route-select').forEach(r => {
+          const stg = r.dataset.routeStage;
+          r.innerHTML = state.groups.map(g => `
+            <option value="${g.id}" ${state.routes[stg] === g.id ? 'selected' : ''}>${escapeHtml(g.name)}</option>
+          `).join('');
+        });
+      }
+
+      function renderReportPreview() {
+        const effective = getEffectiveReportType();
+        const stageNames = {
+          punch_in: 'Office Punch In',
+          tasks: 'Tasks for the Day',
+          break_in: 'Break Punch In',
+          break_out: 'Break Punch Out',
+          punch_out: 'Office Punch Out (EOD)'
+        };
+        document.getElementById('report-stage-subtitle').textContent = `Ready: ${stageNames[effective] || 'Update'}`;
+
+        document.querySelectorAll('.report-type-btn').forEach(btn => {
+          const on = btn.dataset.reportType === state.ui.reportType;
+          btn.className = on
+            ? 'report-type-btn px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#007AFF] text-white'
+            : 'report-type-btn px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F2F2F7] text-[#3C3C43]';
+        });
+
+        const drawer = document.getElementById('preview-drawer');
+        drawer.classList.toggle('hidden', !state.ui.previewOpen);
+        document.getElementById('btn-toggle-preview').textContent = state.ui.previewOpen ? 'Hide' : 'Preview';
+
+        const ta = document.getElementById('report-preview');
+        const resetBtn = document.getElementById('btn-reset-preview');
+        if (!state.ui.customPreviewEdited) {
+          ta.value = buildReportMessage(effective);
+          resetBtn.classList.add('hidden');
+        } else {
+          resetBtn.classList.remove('hidden');
+        }
+      }
+
+      function renderGroupsView() {
+        const grid = document.getElementById('groups-grid');
+        const badges = {
+          whatsapp: { text: 'WhatsApp', cls: 'bg-[#34C759]/15 text-[#248A3D]' },
+          telegram: { text: 'Telegram', cls: 'bg-[#007AFF]/15 text-[#007AFF]' },
+          teams: { text: 'Teams / Slack', cls: 'bg-[#5856D6]/15 text-[#5856D6]' },
+          email: { text: 'Email', cls: 'bg-[#FF9500]/15 text-[#C93400]' }
+        };
+        grid.innerHTML = state.groups.map(g => {
+          const b = badges[g.platform] || { text: g.platform, cls: 'bg-[#F2F2F7] text-[#636366]' };
+          return `
+            <div class="ios-card p-4 flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <h4 class="text-[14px] font-bold text-[#1C1C1E] truncate">${escapeHtml(g.name)}</h4>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${b.cls} shrink-0">${b.text}</span>
+                </div>
+                <p class="text-[11.5px] text-[#8E8E93] mt-0.5 truncate">${g.target ? escapeHtml(g.target) : 'Direct app share sheet'}</p>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button type="button" data-edit-group="${g.id}" class="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-[#007AFF] hover:bg-[#007AFF]/10">Edit</button>
+                ${state.groups.length > 1 ? `<button type="button" data-delete-group="${g.id}" class="px-2 py-1 rounded-lg text-[12px] font-semibold text-[#FF3B30] hover:bg-[#FF3B30]/10">Del</button>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderHistoryView() {
+        const c = document.getElementById('history-container');
+        if (!state.history.length) {
+          c.innerHTML = `
+            <div class="ios-card p-8 text-center">
+              <p class="text-[14px] font-semibold text-[#1C1C1E]">No history yet</p>
+              <p class="text-[12px] text-[#8E8E93] mt-1">Completed shifts appear here automatically.</p>
+            </div>`;
+          return;
+        }
+        c.innerHTML = state.history.map(h => `
+          <div class="ios-card p-4 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[14px] font-bold text-[#1C1C1E]">${escapeHtml(h.dateReadable || h.dateKey)}</span>
+              <span class="px-2.5 py-0.5 rounded-full bg-[#34C759]/15 text-[#248A3D] text-[12px] font-bold tabular-nums">${formatDurationHuman(h.netWorkMs)}</span>
+            </div>
+            <div class="grid grid-cols-3 text-[12px] text-[#636366] pt-1 border-t border-black/[0.06]">
+              <div><span class="text-[#8E8E93] block text-[10px]">IN / OUT</span><strong class="text-[#1C1C1E] tabular-nums">${formatTime12(h.punchIn)} – ${formatTime12(h.punchOut)}</strong></div>
+              <div><span class="text-[#8E8E93] block text-[10px]">BREAK</span><strong class="text-[#1C1C1E] tabular-nums">${formatDurationHuman(h.totalBreakMs)}</strong></div>
+              <div class="text-right"><span class="text-[#8E8E93] block text-[10px]">TASKS</span><strong class="text-[#1C1C1E] tabular-nums">${h.tasksDone}/${h.tasksTotal}</strong></div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function switchView(v) {
+        state.ui.activeView = v;
+        const titles = { dashboard: 'Today', groups: 'Groups', history: 'History' };
+        document.getElementById('header-title').textContent = titles[v] || 'Today';
+        ['dashboard', 'groups', 'history'].forEach(name => {
+          document.getElementById(`view-${name}`).classList.toggle('hidden', name !== v);
+          const tab = document.getElementById(`nav-${name}`);
+          tab.className = name === v
+            ? 'nav-tab flex flex-col items-center gap-0.5 text-[#007AFF] transition-colors'
+            : 'nav-tab flex flex-col items-center gap-0.5 text-[#8E8E93] transition-colors';
+        });
+        if (v === 'groups') { renderGroupsView(); renderGroupSelectors(); }
+        if (v === 'history') renderHistoryView();
+        saveState();
+      }
+
+      function renderAll() {
+        renderSmartHero();
+        renderLiveTick();
+        renderTasks();
+        renderTimeline();
+        renderGroupSelectors();
+        renderReportPreview();
+        renderGroupsView();
+        renderHistoryView();
+        if (window.lucide) window.lucide.createIcons();
+      }
+
+      function openModal(id) {
+        document.getElementById(id).classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      }
+      function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+      function parseReportTimeToToday(rawTime, isAfternoonHint) {
+        if (!rawTime) return null;
+        const m = rawTime.trim().match(/^(\d{1,2})[:;.](\d{2})(?:\s*(am|pm))?$/i);
+        if (!m) return null;
+        let hh = parseInt(m[1], 10);
+        const mm = parseInt(m[2], 10);
+        const ampm = m[3] ? m[3].toLowerCase() : null;
+        if (ampm === 'pm' && hh < 12) hh += 12;
+        else if (ampm === 'am' && hh === 12) hh = 0;
+        else if (!ampm) {
+          // Smart 12h office inference: 1:00–7:59 is PM unless clearly morning
+          if (hh >= 1 && hh <= 7) hh += 12;
+          else if (isAfternoonHint && hh >= 8 && hh <= 11) hh += 12;
+        }
+        const d = new Date();
+        d.setHours(hh, mm, 0, 0);
+        return d.toISOString();
+      }
+
+      function restoreFromReportText(rawText) {
+        const lines = rawText.split(/\r?\n/).map(l => l.trim());
+        let pIn = null, bIn = null, bOut = null, pOut = null;
+        const tasks = [];
+        let inWork = false;
+
+        for (const line of lines) {
+          if (/^name\s*:/i.test(line)) {
+            const v = line.replace(/^name\s*:/i, '').trim();
+            if (v) state.profile.name = v;
+            inWork = false;
+          } else if (/^post\s*:/i.test(line)) {
+            const v = line.replace(/^post\s*:/i, '').trim();
+            if (v) state.profile.department = v;
+            inWork = false;
+          } else if (/^office\s*punch\s*in\s*:/i.test(line)) {
+            pIn = parseReportTimeToToday(line.replace(/^office\s*punch\s*in\s*:/i, '').trim(), false);
+            inWork = false;
+          } else if (/^break\s*punch\s*in\s*:/i.test(line)) {
+            bIn = parseReportTimeToToday(line.replace(/^break\s*punch\s*in\s*:/i, '').trim(), false);
+            inWork = false;
+          } else if (/^break\s*punch\s*out\s*:/i.test(line)) {
+            bOut = parseReportTimeToToday(line.replace(/^break\s*punch\s*out\s*:/i, '').trim(), false);
+            inWork = false;
+          } else if (/^office\s*punch\s*out\s*:/i.test(line)) {
+            pOut = parseReportTimeToToday(line.replace(/^office\s*punch\s*out\s*:/i, '').trim(), true);
+            inWork = false;
+          } else if (/^work\s*:/i.test(line)) {
+            inWork = true;
+            const inlineTask = line.replace(/^work\s*:/i, '').trim();
+            if (inlineTask && inlineTask !== '-') tasks.push(inlineTask);
+          } else if (/^date\s*:/i.test(line)) {
+            inWork = false;
+          } else if (inWork) {
+            if (!line) {
+              inWork = false;
+            } else if (line !== '-') {
+              tasks.push(line.replace(/^[\-•*\d.\s]+/, '').trim() || line);
+            }
+          }
+        }
+
+        if (!pIn && !bIn && !bOut && !pOut && !tasks.length) {
+          showToast('Could not find punch times or tasks in text');
+          return false;
+        }
+
+        const day = createEmptyDay(getTodayKey());
+        day.punchIn = pIn;
+        day.punchOut = pOut;
+        if (bIn) {
+          day.breaks.push({ id: 'brk_' + Date.now(), start: bIn, end: bOut || null });
+        }
+        tasks.forEach((txt, i) => {
+          day.tasks.push({ id: 'tsk_' + Date.now() + '_' + i, text: txt, done: Boolean(pOut) });
+        });
+        if (pIn) day.timeline.unshift({ id: 'ev_1', type: 'punch_in', label: 'Office Punch In (Restored)', time: pIn });
+        if (bIn) day.timeline.unshift({ id: 'ev_2', type: 'break_in', label: 'Break Punch In (Restored)', time: bIn });
+        if (bOut) day.timeline.unshift({ id: 'ev_3', type: 'break_out', label: 'Break Punch Out (Restored)', time: bOut });
+        if (pOut) day.timeline.unshift({ id: 'ev_4', type: 'punch_out', label: 'Office Punch Out (Restored)', time: pOut });
+
+        day.lastStage = pOut ? 'punch_out' : (bOut ? 'break_out' : (bIn ? 'break_in' : 'punch_in'));
+        state.today = day;
+        state.ui.customPreviewEdited = false;
+        saveState();
+        renderAll();
+        showToast('Shift restored from report!');
+        return true;
+      }
+
+      // ---- Event Wiring ----
+      function bindEvents() {
+        document.getElementById('nav-dashboard').addEventListener('click', () => switchView('dashboard'));
+        document.getElementById('nav-groups').addEventListener('click', () => switchView('groups'));
+        document.getElementById('nav-history').addEventListener('click', () => switchView('history'));
+
+        // Smart 1-Button & Secondary Action
+        document.getElementById('btn-smart-action').addEventListener('click', handleSmartButtonClick);
+        document.getElementById('btn-secondary-action').addEventListener('click', handleSecondaryButtonClick);
+
+        // Tasks
+        document.getElementById('task-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const inp = document.getElementById('task-input');
+          const text = inp.value.trim();
+          if (!text) return;
+          state.today.tasks.push({ id: 'tsk_' + Date.now(), text, done: false });
+          inp.value = '';
+          state.ui.customPreviewEdited = false;
+          saveState();
+          renderTasks();
+          renderLiveTick();
+          renderReportPreview();
+          if (window.lucide) window.lucide.createIcons();
+        });
+
+        document.getElementById('task-list').addEventListener('click', (e) => {
+          const tog = e.target.closest('[data-toggle-task]');
+          if (tog) {
+            const task = state.today.tasks.find(x => x.id === tog.dataset.toggleTask);
+            if (task) {
+              task.done = !task.done;
+              state.ui.customPreviewEdited = false;
+              saveState();
+              renderTasks();
+              renderLiveTick();
+              renderReportPreview();
+              if (window.lucide) window.lucide.createIcons();
+            }
+            return;
+          }
+          const del = e.target.closest('[data-delete-task]');
+          if (del) {
+            state.today.tasks = state.today.tasks.filter(x => x.id !== del.dataset.deleteTask);
+            state.ui.customPreviewEdited = false;
+            saveState();
+            renderTasks();
+            renderLiveTick();
+            renderReportPreview();
+            if (window.lucide) window.lucide.createIcons();
+          }
+        });
+
+        document.getElementById('btn-send-tasks-now').addEventListener('click', () => {
+          state.ui.reportType = 'tasks';
+          state.ui.customPreviewEdited = false;
+          autoRoute('tasks');
+          saveState();
+          renderGroupSelectors();
+          renderReportPreview();
+          sendToSelectedGroup();
+        });
+
+        // Preview toggle & stage switcher
+        document.getElementById('btn-toggle-preview').addEventListener('click', () => {
+          state.ui.previewOpen = !state.ui.previewOpen;
+          renderReportPreview();
+        });
+
+        document.getElementById('report-type-pills').addEventListener('click', (e) => {
+          const btn = e.target.closest('.report-type-btn');
+          if (!btn) return;
+          const r = btn.dataset.reportType;
+          state.ui.reportType = r;
+          state.ui.customPreviewEdited = false;
+          autoRoute(r === 'auto' ? state.today.lastStage : r);
+          saveState();
+          renderGroupSelectors();
+          renderReportPreview();
+        });
+
+        document.getElementById('target-group-select').addEventListener('change', (e) => {
+          state.ui.selectedGroupId = e.target.value;
+          saveState();
+          renderGroupSelectors();
+        });
+
+        document.getElementById('report-preview').addEventListener('input', () => {
+          state.ui.customPreviewEdited = true;
+          document.getElementById('btn-reset-preview').classList.remove('hidden');
+        });
+        document.getElementById('btn-reset-preview').addEventListener('click', () => {
+          state.ui.customPreviewEdited = false;
+          renderReportPreview();
+        });
+
+        // Direct send & copy
+        document.getElementById('btn-send-primary').addEventListener('click', sendToSelectedGroup);
+        document.getElementById('btn-copy-report').addEventListener('click', () => {
+          copyText(document.getElementById('report-preview').value.trim());
+          showToast('Report copied');
+        });
+        document.getElementById('btn-send-whatsapp').addEventListener('click', () => {
+          const g = state.groups.find(x => x.id === state.ui.selectedGroupId);
+          openWhatsApp(document.getElementById('report-preview').value.trim(), g && g.platform === 'whatsapp' ? g.target : '');
+        });
+        document.getElementById('btn-send-telegram').addEventListener('click', () => {
+          const g = state.groups.find(x => x.id === state.ui.selectedGroupId);
+          openTelegram(document.getElementById('report-preview').value.trim(), g && g.platform === 'telegram' ? g.target : '');
+        });
+
+        // Settings
+        document.getElementById('btn-open-settings').addEventListener('click', () => {
+          document.getElementById('input-emp-name').value = state.profile.name || '';
+          document.getElementById('input-emp-dept').value = state.profile.department || '';
+          document.getElementById('input-target-hours').value = state.profile.targetHours || 8;
+          openModal('modal-settings');
+        });
+        document.getElementById('settings-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          state.profile.name = document.getElementById('input-emp-name').value.trim();
+          state.profile.department = document.getElementById('input-emp-dept').value.trim();
+          state.profile.targetHours = Math.max(1, Math.min(16, parseFloat(document.getElementById('input-target-hours').value) || 8));
+          state.ui.customPreviewEdited = false;
+          saveState();
+          renderAll();
+          closeModal('modal-settings');
+          showToast('Profile saved');
+        });
+
+        // Adjust times
+        document.getElementById('btn-manual-times').addEventListener('click', () => {
+          document.getElementById('input-edit-punch-in').value = toTimeInputValue(state.today.punchIn);
+          document.getElementById('input-edit-punch-out').value = toTimeInputValue(state.today.punchOut);
+          openModal('modal-times');
+        });
+        document.getElementById('times-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const inV = document.getElementById('input-edit-punch-in').value;
+          const outV = document.getElementById('input-edit-punch-out').value;
+          if (inV) state.today.punchIn = applyTimeToToday(inV);
+          state.today.punchOut = outV ? applyTimeToToday(outV) : null;
+          state.ui.customPreviewEdited = false;
+          saveState();
+          renderAll();
+          closeModal('modal-times');
+          showToast('Times updated');
+        });
+
+        // Reset
+        document.getElementById('btn-reset-day').addEventListener('click', () => openModal('modal-reset'));
+        document.getElementById('btn-confirm-reset').addEventListener('click', () => {
+          state.today = createEmptyDay(getTodayKey());
+          state.ui.reportType = 'auto';
+          state.ui.customPreviewEdited = false;
+          saveState();
+          renderAll();
+          closeModal('modal-reset');
+          showToast('Shift reset');
+        });
+
+        // Groups CRUD
+        document.getElementById('btn-add-group-modal').addEventListener('click', () => {
+          document.getElementById('modal-group-title').textContent = 'Add Reporting Group';
+          document.getElementById('input-group-id').value = '';
+          document.getElementById('input-group-name').value = '';
+          document.getElementById('input-group-platform').value = 'whatsapp';
+          document.getElementById('input-group-target').value = '';
+          openModal('modal-group');
+        });
+        document.getElementById('groups-grid').addEventListener('click', (e) => {
+          const edit = e.target.closest('[data-edit-group]');
+          if (edit) {
+            const g = state.groups.find(x => x.id === edit.dataset.editGroup);
+            if (!g) return;
+            document.getElementById('modal-group-title').textContent = 'Edit Group';
+            document.getElementById('input-group-id').value = g.id;
+            document.getElementById('input-group-name').value = g.name;
+            document.getElementById('input-group-platform').value = g.platform;
+            document.getElementById('input-group-target').value = g.target || '';
+            openModal('modal-group');
+            return;
+          }
+          const del = e.target.closest('[data-delete-group]');
+          if (del && state.groups.length > 1) {
+            const id = del.dataset.deleteGroup;
+            state.groups = state.groups.filter(x => x.id !== id);
+            if (state.ui.selectedGroupId === id) state.ui.selectedGroupId = state.groups[0].id;
+            Object.keys(state.routes).forEach(k => { if (state.routes[k] === id) state.routes[k] = state.groups[0].id; });
+            saveState();
+            renderGroupsView();
+            renderGroupSelectors();
+            showToast('Group deleted');
+          }
+        });
+        document.getElementById('group-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const id = document.getElementById('input-group-id').value;
+          const name = document.getElementById('input-group-name').value.trim();
+          const platform = document.getElementById('input-group-platform').value;
+          const target = document.getElementById('input-group-target').value.trim();
+          if (!name) return;
+          if (id) {
+            const g = state.groups.find(x => x.id === id);
+            if (g) { g.name = name; g.platform = platform; g.target = target; }
+          } else {
+            const newId = 'grp_' + Date.now();
+            state.groups.push({ id: newId, name, platform, target });
+            state.ui.selectedGroupId = newId;
+          }
+          saveState();
+          renderGroupsView();
+          renderGroupSelectors();
+          closeModal('modal-group');
+          showToast(id ? 'Group updated' : 'Group added');
+        });
+
+        document.querySelectorAll('.route-select').forEach(sel => {
+          sel.addEventListener('change', (e) => {
+            state.routes[e.target.dataset.routeStage] = e.target.value;
+            saveState();
+            showToast('Routing saved');
+          });
+        });
+
+        // History
+        document.getElementById('btn-save-today-history').addEventListener('click', () => {
+          if (!state.today.punchIn) { showToast('Punch in first'); return; }
+          upsertTodayHistory();
+          saveState();
+          renderHistoryView();
+          showToast('Saved today to history');
+        });
+        document.getElementById('btn-export-csv').addEventListener('click', () => {
+          if (!state.history.length) { showToast('No history to export'); return; }
+          const headers = ['Date', 'Punch In', 'Punch Out', 'Breaks', 'Total Break', 'Net Working', 'Tasks Done', 'Total Tasks'];
+          const rows = state.history.map(h => [
+            `"${h.dateReadable || h.dateKey}"`, `"${formatTime12(h.punchIn)}"`, `"${formatTime12(h.punchOut)}"`,
+            h.breakCount, `"${formatDurationHuman(h.totalBreakMs)}"`, `"${formatDurationHuman(h.netWorkMs)}"`,
+            h.tasksDone, h.tasksTotal
+          ].join(','));
+          const blob = new Blob([[headers.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `attendance-${getTodayKey()}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('CSV exported');
+        });
+
+        // Close modals
+        document.querySelectorAll('[data-close-modal]').forEach(b => {
+          b.addEventListener('click', () => closeModal(b.dataset.closeModal));
+        });
+        // Resume from report modal
+        document.getElementById('btn-open-resume').addEventListener('click', () => {
+          document.getElementById('input-resume-text').value = '';
+          openModal('modal-resume');
+        });
+        document.getElementById('resume-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const txt = document.getElementById('input-resume-text').value.trim();
+          if (restoreFromReportText(txt)) closeModal('modal-resume');
+        });
+
+        // Backup & Restore JSON
+        document.getElementById('btn-export-backup').addEventListener('click', () => {
+          const payload = JSON.stringify({
+            profile: state.profile,
+            groups: state.groups,
+            routes: state.routes,
+            today: state.today,
+            history: state.history
+          }, null, 2);
+          const blob = new Blob([payload], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `workpulse-backup-${getTodayKey()}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('Backup file saved');
+        });
+        document.getElementById('btn-import-backup').addEventListener('click', () => {
+          document.getElementById('input-import-backup').click();
+        });
+        document.getElementById('input-import-backup').addEventListener('change', (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const parsed = JSON.parse(String(reader.result || '{}'));
+              if (parsed.profile) state.profile = { ...state.profile, ...parsed.profile };
+              if (Array.isArray(parsed.groups) && parsed.groups.length) state.groups = parsed.groups;
+              if (parsed.routes) state.routes = { ...state.routes, ...parsed.routes };
+              if (parsed.today) state.today = { ...createEmptyDay(parsed.today.dateKey || getTodayKey()), ...parsed.today };
+              if (Array.isArray(parsed.history)) state.history = parsed.history;
+              state.ui.customPreviewEdited = false;
+              saveState();
+              renderAll();
+              closeModal('modal-settings');
+              showToast('Backup restored!');
+            } catch (err) {
+              showToast('Invalid backup file');
+            }
+          };
+          reader.readAsText(file);
+          e.target.value = '';
+        });
+
+        ['modal-settings', 'modal-group', 'modal-times', 'modal-reset', 'modal-resume'].forEach(id => {
+          const el = document.getElementById(id);
+          el.addEventListener('click', (e) => { if (e.target === el) closeModal(id); });
+        });
+      }
+
+      bindEvents();
+      switchView(state.ui.activeView || 'dashboard');
+      renderAll();
+
+      if (clockInterval) clearInterval(clockInterval);
+      clockInterval = setInterval(renderLiveTick, 1000);
+    })();
+  </script>
+</body>
+</html>
