@@ -1340,7 +1340,9 @@
 
       function restoreFromReportText(rawText) {
         const lines = rawText.split(/\r?\n/).map(l => l.trim());
-        let pIn = null, bIn = null, bOut = null, pOut = null;
+        let pIn = null, pOut = null;
+        let currentBreak = null;
+        const restoredBreaks = [];
         const tasks = [];
         let inWork = false;
 
@@ -1356,11 +1358,14 @@
           } else if (/^office\s*punch\s*in\s*:/i.test(line)) {
             pIn = parseReportTimeToToday(line.replace(/^office\s*punch\s*in\s*:/i, '').trim(), false);
             inWork = false;
-          } else if (/^break\s*punch\s*in\s*:/i.test(line)) {
-            bIn = parseReportTimeToToday(line.replace(/^break\s*punch\s*in\s*:/i, '').trim(), false);
+          } else if (/^break(?:\s+\d+)?\s*punch\s*in\s*:/i.test(line)) {
+            currentBreak = { id: 'brk_' + Date.now() + '_' + restoredBreaks.length, start: parseReportTimeToToday(line.replace(/^break(?:\s+\d+)?\s*punch\s*in\s*:/i, '').trim(), false), end: null };
+            if (currentBreak.start) restoredBreaks.push(currentBreak);
+            else currentBreak = null;
             inWork = false;
-          } else if (/^break\s*punch\s*out\s*:/i.test(line)) {
-            bOut = parseReportTimeToToday(line.replace(/^break\s*punch\s*out\s*:/i, '').trim(), false);
+          } else if (/^break(?:\s+\d+)?\s*punch\s*out\s*:/i.test(line)) {
+            const breakOut = parseReportTimeToToday(line.replace(/^break(?:\s+\d+)?\s*punch\s*out\s*:/i, '').trim(), false);
+            if (currentBreak && breakOut) currentBreak.end = breakOut;
             inWork = false;
           } else if (/^office\s*punch\s*out\s*:/i.test(line)) {
             pOut = parseReportTimeToToday(line.replace(/^office\s*punch\s*out\s*:/i, '').trim(), true);
@@ -1380,7 +1385,7 @@
           }
         }
 
-        if (!pIn && !bIn && !bOut && !pOut && !tasks.length) {
+        if (!pIn && !restoredBreaks.length && !pOut && !tasks.length) {
           showToast('Could not find punch times or tasks in text');
           return false;
         }
@@ -1388,18 +1393,18 @@
         const day = createEmptyDay(getTodayKey());
         day.punchIn = pIn;
         day.punchOut = pOut;
-        if (bIn) {
-          day.breaks.push({ id: 'brk_' + Date.now(), start: bIn, end: bOut || null });
-        }
+        day.breaks = restoredBreaks;
         tasks.forEach((txt, i) => {
           day.tasks.push({ id: 'tsk_' + Date.now() + '_' + i, text: txt, done: Boolean(pOut) });
         });
         if (pIn) day.timeline.unshift({ id: 'ev_1', type: 'punch_in', label: 'Office Punch In (Restored)', time: pIn });
-        if (bIn) day.timeline.unshift({ id: 'ev_2', type: 'break_in', label: 'Break Punch In (Restored)', time: bIn });
-        if (bOut) day.timeline.unshift({ id: 'ev_3', type: 'break_out', label: 'Break Punch Out (Restored)', time: bOut });
+        restoredBreaks.forEach((br, index) => {
+          day.timeline.unshift({ id: 'ev_break_in_' + index, type: 'break_in', label: `Break ${index + 1} Punch In (Restored)`, time: br.start });
+          if (br.end) day.timeline.unshift({ id: 'ev_break_out_' + index, type: 'break_out', label: `Break ${index + 1} Punch Out (Restored)`, time: br.end });
+        });
         if (pOut) day.timeline.unshift({ id: 'ev_4', type: 'punch_out', label: 'Office Punch Out (Restored)', time: pOut });
 
-        day.lastStage = pOut ? 'punch_out' : (bOut ? 'break_out' : (bIn ? 'break_in' : 'punch_in'));
+        day.lastStage = pOut ? 'punch_out' : (restoredBreaks.some(br => br.start && !br.end) ? 'break_in' : (restoredBreaks.length ? 'break_out' : 'punch_in'));
         state.today = day;
         state.ui.customPreviewEdited = false;
         saveState();
