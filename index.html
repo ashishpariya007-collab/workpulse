@@ -586,7 +586,7 @@
               ? { ...createEmptyDay(getTodayKey()), ...parsed.today }
               : createEmptyDay(getTodayKey()),
             history: Array.isArray(parsed.history) ? parsed.history : [],
-            ui: { ...defaultState.ui, ...(parsed.ui || {}), customPreviewEdited: false, previewOpen: true }
+            ui: { ...defaultState.ui, ...(parsed.ui || {}), previewOpen: true }
           };
           if (!merged.groups.some(g => g.id === merged.ui.selectedGroupId)) {
             merged.ui.selectedGroupId = merged.groups[0].id;
@@ -608,7 +608,9 @@
             ui: {
               activeView: state.ui.activeView,
               reportType: state.ui.reportType,
-              selectedGroupId: state.ui.selectedGroupId
+              selectedGroupId: state.ui.selectedGroupId,
+              customPreviewEdited: state.ui.customPreviewEdited,
+              customPreviewText: state.ui.customPreviewText || ''
             }
           });
           writePersistedRaw(serialized);
@@ -1224,7 +1226,10 @@
 
         const ta = document.getElementById('report-preview');
         const resetBtn = document.getElementById('btn-reset-preview');
-        if (!state.ui.customPreviewEdited) {
+        if (state.ui.customPreviewEdited && state.ui.customPreviewText) {
+          ta.value = state.ui.customPreviewText;
+          resetBtn.classList.remove('hidden');
+        } else if (!state.ui.customPreviewEdited) {
           ta.value = buildReportMessage(effective);
           resetBtn.classList.add('hidden');
         } else {
@@ -1540,11 +1545,15 @@
 
         document.getElementById('report-preview').addEventListener('input', (e) => {
           state.ui.customPreviewEdited = true;
+          state.ui.customPreviewText = e.target.value;
+          saveState();
           document.getElementById('btn-reset-preview').classList.remove('hidden');
           syncAttendanceFromDraft(e.target.value);
         });
         document.getElementById('btn-reset-preview').addEventListener('click', () => {
           state.ui.customPreviewEdited = false;
+          state.ui.customPreviewText = '';
+          saveState();
           renderReportPreview();
         });
 
