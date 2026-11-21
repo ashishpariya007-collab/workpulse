@@ -1338,6 +1338,43 @@
         return d.toISOString();
       }
 
+      function syncAttendanceFromDraft(rawText) {
+        const lines = rawText.split(/\r?\n/).map(line => line.trim());
+        let punchIn = undefined, punchOut = undefined;
+        const breaks = [];
+        let currentBreak = null;
+        for (const line of lines) {
+          let match;
+          if ((match = line.match(/^office\s*punch\s*in\s*:\s*(.*)$/i))) {
+            punchIn = match[1] ? parseReportTimeToToday(match[1], false) : null;
+          } else if ((match = line.match(/^break(?:\s+(\d+))?\s*punch\s*in\s*:\s*(.*)$/i))) {
+            currentBreak = { id: 'brk_draft_' + (match[1] || (breaks.length + 1)), start: match[2] ? parseReportTimeToToday(match[2], false) : null, end: null };
+            if (currentBreak.start) breaks.push(currentBreak);
+            else currentBreak = null;
+          } else if ((match = line.match(/^break(?:\s+(\d+))?\s*punch\s*out\s*:\s*(.*)$/i))) {
+            const value = match[2] ? parseReportTimeToToday(match[2], false) : null;
+            if (currentBreak) currentBreak.end = value;
+          } else if ((match = line.match(/^office\s*punch\s*out\s*:\s*(.*)$/i))) {
+            punchOut = match[1] ? parseReportTimeToToday(match[1], true) : null;
+          }
+        }
+        if (punchIn !== undefined) state.today.punchIn = punchIn;
+        if (punchOut !== undefined) state.today.punchOut = punchOut;
+        if (lines.some(line => /^break(?:\s+\d+)?\s*punch\s*(?:in|out)\s*:/i.test(line))) state.today.breaks = breaks;
+        state.today.timeline = state.today.timeline.filter(ev => !['punch_in','break_in','break_out','punch_out'].includes(ev.type));
+        if (state.today.punchIn) state.today.timeline.push({ id: 'draft_punch_in_' + Date.now(), type: 'punch_in', label: 'Office Punch In (Edited)', time: state.today.punchIn });
+        state.today.breaks.forEach((br, index) => {
+          if (br.start) state.today.timeline.push({ id: 'draft_break_in_' + index, type: 'break_in', label: 'Break Punch In (Edited)', time: br.start });
+          if (br.end) state.today.timeline.push({ id: 'draft_break_out_' + index, type: 'break_out', label: 'Break Punch Out (Edited)', time: br.end });
+        });
+        if (state.today.punchOut) state.today.timeline.push({ id: 'draft_punch_out_' + Date.now(), type: 'punch_out', label: 'Office Punch Out (Edited)', time: state.today.punchOut });
+        state.today.timeline.sort((a,b) => new Date(b.time) - new Date(a.time));
+        state.today.lastStage = state.today.punchOut ? 'punch_out' : (state.today.breaks.some(br => br.start && !br.end) ? 'break_in' : (state.today.breaks.length ? 'break_out' : (state.today.punchIn ? 'punch_in' : 'punch_in')));
+        saveState();
+        renderLiveTick();
+        renderDashboard();
+      }
+
       function restoreFromReportText(rawText) {
         const lines = rawText.split(/\r?\n/).map(l => l.trim());
         let pIn = null, pOut = null;
@@ -1500,9 +1537,10 @@
           renderGroupSelectors();
         });
 
-        document.getElementById('report-preview').addEventListener('input', () => {
+        document.getElementById('report-preview').addEventListener('input', (e) => {
           state.ui.customPreviewEdited = true;
           document.getElementById('btn-reset-preview').classList.remove('hidden');
+          syncAttendanceFromDraft(e.target.value);
         });
         document.getElementById('btn-reset-preview').addEventListener('click', () => {
           state.ui.customPreviewEdited = false;
