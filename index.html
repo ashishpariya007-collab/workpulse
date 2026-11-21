@@ -445,7 +445,15 @@
           <label for="input-edit-punch-out" class="block text-[12px] font-semibold text-[#636366] mb-1">Office Punch Out (optional)</label>
           <input id="input-edit-punch-out" type="time" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30" />
         </div>
-        <button type="submit" class="ios-spring w-full py-3 rounded-xl bg-[#007AFF] text-white text-[15px] font-semibold mt-1">Apply Times</button>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-[12px] font-semibold text-[#636366]">Break Punches</label>
+            <button id="btn-add-edit-break" type="button" class="text-[12px] font-semibold text-[#007AFF]">+ Add break</button>
+          </div>
+          <div id="edit-break-list" class="space-y-2"></div>
+          <p class="text-[11px] text-[#8E8E93]">Add or correct missed breaks. Leave Break Out empty if you're currently on a break.</p>
+        </div>
+        <button type="submit" class="ios-spring w-full py-3 rounded-xl bg-[#007AFF] text-white text-[15px] font-semibold mt-1">Apply & Update Message</button>        <button type="submit" class="ios-spring w-full py-3 rounded-xl bg-[#007AFF] text-white text-[15px] font-semibold mt-1">Apply Times</button>
       </form>
     </div>
   </div>
@@ -753,36 +761,25 @@
         const post = (state.profile.department || 'Social Media Manager').trim();
         const dateStr = formatDateDDMMYYYY(new Date());
 
-        const firstBreak = t.breaks[0] || null;
-        const lastBreak = t.breaks[t.breaks.length - 1] || null;
-
         const punchInStr = t.punchIn ? formatTimeShort(t.punchIn) : '';
-        const breakInStr = firstBreak && firstBreak.start ? formatTimeShort(firstBreak.start) : '';
-        const breakOutStr = lastBreak && lastBreak.end ? formatTimeShort(lastBreak.end) : '';
         const punchOutStr = t.punchOut ? formatTimeShort(t.punchOut) : '';
-
         const lines = [
           `Name: ${name}`,
           `Post: ${post}`,
           `Date: ${dateStr}`,
           '',
-          punchInStr ? `Office Punch in: ${punchInStr}` : 'Office Punch in:',
-          breakInStr ? `Break Punch in: ${breakInStr}` : 'Break Punch in:',
-          '',
-          'Work:'
+          punchInStr ? `Office Punch in: ${punchInStr}` : 'Office Punch in:'
         ];
-
-        if (t.tasks.length) {
-          t.tasks.forEach(task => lines.push(task.text));
-        }
-
-        lines.push(
-          '',
-          breakOutStr ? `Break Punch out: ${breakOutStr}` : 'Break Punch out:',
-          punchOutStr ? `Office Punch out: ${punchOutStr}` : 'Office Punch out:'
-        );
-
-        return lines.join('\n');
+        t.breaks.forEach((br, index) => {
+          lines.push(
+            br.start ? `Break ${index + 1} Punch in: ${formatTimeShort(br.start)}` : `Break ${index + 1} Punch in:`,
+            br.end ? `Break ${index + 1} Punch out: ${formatTimeShort(br.end)}` : `Break ${index + 1} Punch out:`
+          );
+        });
+        lines.push('', 'Work:');
+        if (t.tasks.length) t.tasks.forEach(task => lines.push(task.text));
+        lines.push('', punchOutStr ? `Office Punch out: ${punchOutStr}` : 'Office Punch out:');
+        return lines.join('\\n');        return lines.join('\n');
       }
 
       // ---- Toast ----
@@ -1541,25 +1538,75 @@
           showToast('Profile saved');
         });
 
-        // Adjust times
+        // Adjust punches and breaks; corrections refresh the saved report draft.
+        function renderEditableBreaks() {
+          const list = document.getElementById('edit-break-list');
+          list.innerHTML = state.today.breaks.map((br, index) => `
+            <div class="rounded-xl bg-[#F2F2F7] p-3 space-y-2" data-edit-break-row="${index}">
+              <div class="flex items-center justify-between">
+                <span class="text-[12px] font-semibold text-[#1C1C1E]">Break ${index + 1}</span>
+                <button type="button" data-remove-edit-break="${index}" class="text-[11px] font-semibold text-[#FF3B30]">Remove</button>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="text-[11px] font-medium text-[#636366]">Break In
+                  <input data-edit-break-start="${index}" type="time" value="${toTimeInputValue(br.start)}" class="mt-1 w-full px-2.5 py-2 rounded-lg bg-white text-[13px]" />
+                </label>
+                <label class="text-[11px] font-medium text-[#636366]">Break Out
+                  <input data-edit-break-end="${index}" type="time" value="${toTimeInputValue(br.end)}" class="mt-1 w-full px-2.5 py-2 rounded-lg bg-white text-[13px]" />
+                </label>
+              </div>
+            </div>`).join('');
+        }
+
         document.getElementById('btn-manual-times').addEventListener('click', () => {
           document.getElementById('input-edit-punch-in').value = toTimeInputValue(state.today.punchIn);
           document.getElementById('input-edit-punch-out').value = toTimeInputValue(state.today.punchOut);
+          renderEditableBreaks();
           openModal('modal-times');
+        });
+        document.getElementById('btn-add-edit-break').addEventListener('click', () => {
+          state.today.breaks.push({ id: 'brk_' + Date.now(), start: null, end: null });
+          renderEditableBreaks();
+        });
+        document.getElementById('edit-break-list').addEventListener('click', (e) => {
+          const remove = e.target.closest('[data-remove-edit-break]');
+          if (!remove) return;
+          state.today.breaks.splice(Number(remove.dataset.removeEditBreak), 1);
+          renderEditableBreaks();
         });
         document.getElementById('times-form').addEventListener('submit', (e) => {
           e.preventDefault();
           const inV = document.getElementById('input-edit-punch-in').value;
           const outV = document.getElementById('input-edit-punch-out').value;
-          if (inV) state.today.punchIn = applyTimeToToday(inV);
+          const editedBreaks = [];
+          for (const [index, row] of Array.from(document.querySelectorAll('[data-edit-break-row]')).entries()) {
+            const startV = row.querySelector('[data-edit-break-start]').value;
+            const endV = row.querySelector('[data-edit-break-end]').value;
+            if (!startV) { showToast('Enter a Break In time or remove the empty break'); return; }
+            editedBreaks.push({ id: state.today.breaks[index]?.id || ('brk_' + Date.now() + '_' + index), start: applyTimeToToday(startV), end: endV ? applyTimeToToday(endV) : null });
+          }
+          if (outV && !inV) { showToast('Add Office Punch In before Punch Out'); return; }
+          state.today.punchIn = inV ? applyTimeToToday(inV) : null;
           state.today.punchOut = outV ? applyTimeToToday(outV) : null;
+          state.today.breaks = editedBreaks;
+          state.today.timeline = state.today.timeline.filter(ev => !['punch_in','break_in','break_out','punch_out'].includes(ev.type));
+          if (state.today.punchIn) state.today.timeline.push({ id: 'edit_punch_in_' + Date.now(), type: 'punch_in', label: 'Office Punch In (Adjusted)', time: state.today.punchIn });
+          state.today.breaks.forEach((br, index) => {
+            if (br.start) state.today.timeline.push({ id: 'edit_break_in_' + index + '_' + Date.now(), type: 'break_in', label: `Break ${index + 1} Punch In (Adjusted)`, time: br.start });
+            if (br.end) state.today.timeline.push({ id: 'edit_break_out_' + index + '_' + Date.now(), type: 'break_out', label: `Break ${index + 1} Punch Out (Adjusted)`, time: br.end });
+          });
+          if (state.today.punchOut) state.today.timeline.push({ id: 'edit_punch_out_' + Date.now(), type: 'punch_out', label: 'Office Punch Out (Adjusted)', time: state.today.punchOut });
+          state.today.timeline.sort((a,b) => new Date(b.time) - new Date(a.time));
+          state.today.lastStage = state.today.punchOut ? 'punch_out' : (state.today.breaks.some(br => br.start && !br.end) ? 'break_in' : (state.today.breaks.length ? 'break_out' : 'punch_in'));
+          state.ui.reportType = 'auto';
           state.ui.customPreviewEdited = false;
           saveState();
           renderAll();
           closeModal('modal-times');
-          showToast('Times updated');
+          showToast('Attendance corrected & message updated');
         });
 
+        // Reset
         // Reset
         document.getElementById('btn-reset-day').addEventListener('click', () => openModal('modal-reset'));
         document.getElementById('btn-confirm-reset').addEventListener('click', () => {
