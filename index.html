@@ -10,6 +10,13 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <style>
+    @keyframes overtimePulse {
+      0%, 100% { transform: translateY(0) scale(1); box-shadow: 0 0 0 0 rgba(245,158,11,.22); }
+      50% { transform: translateY(-1px) scale(1.035); box-shadow: 0 0 0 7px rgba(245,158,11,0); }
+    }
+    .overtime-pulse { animation: overtimePulse 1.8s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) { .overtime-pulse { animation: none !important; } }
+
     :root {
       --ios-bg: #F2F2F7;
       --ios-card: #FFFFFF;
@@ -120,6 +127,7 @@
               <span id="ring-caption" class="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">Working Hrs</span>
               <div id="metric-net-work" class="text-[30px] font-bold tracking-tight text-[#1C1C1E] tabular-nums leading-none mt-1">00:00:00</div>
               <span id="ring-subcaption" class="text-[12px] font-medium text-[#8E8E93] mt-1.5 tabular-nums">Target 8h 00m</span>
+              <span id="overtime-indicator" class="hidden mt-2 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-extrabold tracking-wide uppercase">⚡ Overtime +00:00</span>
             </div>
           </div>
 
@@ -745,6 +753,23 @@
         return { grossMs, totalBreakMs, activeBreakMs, netWorkMs, progressRatio };
       }
 
+      function getOvertimeMs() {
+        const endMs = state.today.punchOut ? new Date(state.today.punchOut).getTime() : Date.now();
+        const metrics = computeMetrics(endMs);
+        const targetMs = Math.max(1, Number(state.profile.targetHours) || 8) * 3600000;
+        return Math.max(0, metrics.netWorkMs - targetMs);
+      }
+
+      function getMessageWithOvertimeTag(rawText) {
+        const overtimeMs = getOvertimeMs();
+        const lines = String(rawText || '').split(/\r?\n/).filter(line => !/^overtime\s*:/i.test(line.trim()));
+        if (overtimeMs > 0) {
+          const punchOutIndex = lines.findIndex(line => /^office\s*punch\s*out\s*:/i.test(line.trim()));
+          lines.splice(punchOutIndex >= 0 ? punchOutIndex + 1 : lines.length, 0, `Overtime: ${formatDurationHM(overtimeMs)}`);
+        }
+        return lines.join('\n').trim();
+      }
+
       function getEffectiveReportType() {
         return state.ui.reportType !== 'auto' ? state.ui.reportType : (state.today.lastStage || 'punch_in');
       }
@@ -781,6 +806,8 @@
         lines.push('', 'Work:');
         if (t.tasks.length) t.tasks.forEach(task => lines.push(task.text));
         lines.push('', punchOutStr ? `Office Punch out: ${punchOutStr}` : 'Office Punch out:');
+        const overtimeMs = getOvertimeMs();
+        if (overtimeMs > 0) lines.push(`Overtime: ${formatDurationHM(overtimeMs)}`);
         return lines.join('\n');
       }
 
@@ -847,7 +874,11 @@
       }
 
       function sendToSelectedGroup() {
-        const text = document.getElementById('report-preview').value.trim();
+        const preview = document.getElementById('report-preview');
+        const text = getMessageWithOvertimeTag(preview.value);
+        preview.value = text;
+        if (state.ui.customPreviewEdited) state.ui.customPreviewText = text;
+        saveState();
         if (!text) return;
         const group = state.groups.find(g => g.id === state.ui.selectedGroupId) || state.groups[0];
         if (!group) {
@@ -1013,6 +1044,17 @@
         const offset = RING_CIRCUMFERENCE * (1 - m.progressRatio);
         ringEl.style.strokeDashoffset = offset;
         ringEl.style.stroke = stage === 'need_break_out' ? '#FF9500' : (stage === 'completed' ? '#5856D6' : '#34C759');
+
+        const overtimeMs = Math.max(0, m.netWorkMs - targetH * 3600000);
+        const overtimeEl = document.getElementById('overtime-indicator');
+        if (overtimeMs > 0) {
+          overtimeEl.textContent = `⚡ OVERTIME +${formatDurationHM(overtimeMs)}`;
+          overtimeEl.classList.remove('hidden');
+          overtimeEl.classList.add('overtime-pulse');
+        } else {
+          overtimeEl.classList.add('hidden');
+          overtimeEl.classList.remove('overtime-pulse');
+        }
 
         document.getElementById('metric-break-time').textContent = formatDurationHM(m.totalBreakMs);
         document.getElementById('metric-gross-time').textContent = formatDurationHM(m.grossMs);
@@ -1560,16 +1602,28 @@
         // Direct send & copy
         document.getElementById('btn-send-primary').addEventListener('click', sendToSelectedGroup);
         document.getElementById('btn-copy-report').addEventListener('click', () => {
-          copyText(document.getElementById('report-preview').value.trim());
+          const preview = document.getElementById('report-preview');
+          preview.value = getMessageWithOvertimeTag(preview.value);
+          if (state.ui.customPreviewEdited) state.ui.customPreviewText = preview.value;
+          saveState();
+          copyText(preview.value);
           showToast('Report copied');
         });
         document.getElementById('btn-send-whatsapp').addEventListener('click', () => {
           const g = state.groups.find(x => x.id === state.ui.selectedGroupId);
-          openWhatsApp(document.getElementById('report-preview').value.trim(), g && g.platform === 'whatsapp' ? g.target : '');
+          const preview = document.getElementById('report-preview');
+          preview.value = getMessageWithOvertimeTag(preview.value);
+          if (state.ui.customPreviewEdited) state.ui.customPreviewText = preview.value;
+          saveState();
+          openWhatsApp(preview.value, g && g.platform === 'whatsapp' ? g.target : '');
         });
         document.getElementById('btn-send-telegram').addEventListener('click', () => {
           const g = state.groups.find(x => x.id === state.ui.selectedGroupId);
-          openTelegram(document.getElementById('report-preview').value.trim(), g && g.platform === 'telegram' ? g.target : '');
+          const preview = document.getElementById('report-preview');
+          preview.value = getMessageWithOvertimeTag(preview.value);
+          if (state.ui.customPreviewEdited) state.ui.customPreviewText = preview.value;
+          saveState();
+          openTelegram(preview.value, g && g.platform === 'telegram' ? g.target : '');
         });
 
         // Settings
